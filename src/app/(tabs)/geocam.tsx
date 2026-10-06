@@ -7,23 +7,21 @@ import {
   StyleSheet,
   Alert,
   Animated,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { CameraView } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
 import { useCamera } from '@/hooks/useCamera';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
 import { PermissionPrimer } from '@/components/PermissionPrimer';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
+import { usePhotos } from '@/hooks/usePhotos';
 import { openInGoogleMaps } from '@/utils/mapUtils';
-
-const { width } = Dimensions.get('window');
 
 export default function GeoCamScreen() {
   const cam = useCamera();
   const geo = useGeoLocation({ watch: true });
-  const { photos, addPhoto } = useGeoPhotos();
+  const { photos, addPhoto } = usePhotos();
   const [flashAnim] = useState(new Animated.Value(0));
 
   const lastPhoto = photos[0] ?? null;
@@ -76,12 +74,10 @@ export default function GeoCamScreen() {
         }
       }
 
-      addPhoto({
-        id: String(Date.now()),
+      await addPhoto({
         uri: photo.uri,
         coords,
         source: 'camera',
-        createdAt: Date.now(),
       });
     } catch (err) {
       console.warn('handleCapture error on Android/iOS:', err);
@@ -105,12 +101,10 @@ export default function GeoCamScreen() {
           coords = geo.coords ?? (await geo.getCurrent());
         }
 
-        addPhoto({
-          id: String(Date.now()),
+        await addPhoto({
           uri: asset.uri,
           coords,
           source: 'gallery',
-          createdAt: Date.now(),
         });
       }
     } catch (err) {
@@ -201,10 +195,16 @@ export default function GeoCamScreen() {
         {lastPhoto ? (
           <Pressable
             onPress={() => {
-              if (lastPhoto.coords) {
+              router.push({
+                pathname: '/foto/[id]',
+                params: { id: String(lastPhoto.id) },
+              });
+            }}
+            onLongPress={() => {
+              if (lastPhoto.latitude !== null && lastPhoto.longitude !== null) {
                 openInGoogleMaps(
-                  lastPhoto.coords.latitude,
-                  lastPhoto.coords.longitude,
+                  lastPhoto.latitude,
+                  lastPhoto.longitude,
                   lastPhoto.source === 'gallery' ? 'Foto de Galería' : 'Foto de Cámara'
                 );
               } else {
@@ -212,7 +212,7 @@ export default function GeoCamScreen() {
               }
             }}
             style={styles.thumbnailWrapper}
-            accessibilityLabel="Ver en Google Maps"
+            accessibilityLabel="Ver detalle de foto"
           >
             <Image
               source={{ uri: lastPhoto.uri }}
@@ -268,7 +268,7 @@ export default function GeoCamScreen() {
 
         {/* Botón alternar cámara frontal / trasera */}
         <Pressable
-          onPress={cam.toggleFacing}
+          onPress={() => cam.toggleFacing()}
           style={({ pressed }) => [styles.glassButton, pressed && styles.glassButtonPressed]}
           accessibilityLabel="Girar cámara"
         >

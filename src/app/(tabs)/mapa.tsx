@@ -9,28 +9,53 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
+import { router } from 'expo-router';
+import { usePhotos } from '@/hooks/usePhotos';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
 import type { GeoPhoto } from '@/types/geo';
 import MapComponent from '@/components/MapComponent';
 import { openInGoogleMaps } from '@/utils/mapUtils';
 
 export default function MapaScreen() {
-  const { photos, removePhoto } = useGeoPhotos();
+  const { photos, photosWithLocation, removePhoto } = usePhotos();
   const geo = useGeoLocation({ watch: true });
   const [selectedPhoto, setSelectedPhoto] = useState<GeoPhoto | null>(null);
 
   const photosWithCoords = useMemo(
     () =>
-      photos.filter(
-        (p): p is GeoPhoto & { coords: NonNullable<GeoPhoto['coords']> } =>
-          p.coords !== null
-      ),
-    [photos]
+      photosWithLocation.map((p) => ({
+        id: p.id,
+        uri: p.uri,
+        coords: {
+          latitude: p.latitude!,
+          longitude: p.longitude!,
+          accuracy: p.accuracy,
+        },
+        source: p.source,
+        createdAt: p.createdAt instanceof Date ? p.createdAt.getTime() : Number(p.createdAt),
+        albumId: p.albumId,
+        albumName: p.albumName,
+        note: p.note,
+        favorite: p.favorite,
+      })),
+    [photosWithLocation]
   );
 
   const photosWithoutCoords = useMemo(
-    () => photos.filter((p) => p.coords === null),
+    () =>
+      photos
+        .filter((p) => p.latitude === null || p.longitude === null)
+        .map((p) => ({
+          id: p.id,
+          uri: p.uri,
+          coords: null,
+          source: p.source,
+          createdAt: p.createdAt instanceof Date ? p.createdAt.getTime() : Number(p.createdAt),
+          albumId: p.albumId,
+          albumName: p.albumName,
+          note: p.note,
+          favorite: p.favorite,
+        })),
     [photos]
   );
 
@@ -63,14 +88,14 @@ export default function MapaScreen() {
   const confirmDelete = (photo: GeoPhoto) => {
     Alert.alert(
       'Eliminar Foto',
-      '¿Deseas eliminar permanentemente esta foto?',
+      '¿Deseas eliminar permanentemente esta foto y su archivo?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
           onPress: () => {
-            removePhoto(photo.id);
+            removePhoto(Number(photo.id));
             if (selectedPhoto?.id === photo.id) {
               setSelectedPhoto(null);
             }
@@ -190,6 +215,30 @@ export default function MapaScreen() {
                   <Text style={styles.googleMapsText}>Ver Pin en Google Maps</Text>
                 </TouchableOpacity>
               )}
+
+              {/* Botón para ver y editar detalles de la foto */}
+              <TouchableOpacity
+                style={[
+                  styles.googleMapsButton,
+                  {
+                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                    borderColor: 'rgba(59, 130, 246, 0.35)',
+                    marginTop: 6,
+                  },
+                ]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/foto/[id]',
+                    params: { id: String(selectedPhoto.id) },
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Text style={styles.googleMapsIcon}>📝</Text>
+                <Text style={[styles.googleMapsText, { color: '#60a5fa' }]}>
+                  Ver Detalles / Editar
+                </Text>
+              </TouchableOpacity>
 
               {/* Action Buttons: Cerrar y Eliminar */}
               <View style={styles.selectedActions}>

@@ -120,7 +120,7 @@ export function useGeoLocation({ watch = false }: Options = {}) {
         getCurrent();
       }
       return res.granted;
-    } catch (e) {
+    } catch (_e) {
       setState((s) => ({ ...s, permission: 'denied' }));
       return false;
     }
